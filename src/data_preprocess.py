@@ -220,7 +220,7 @@ class PreprocessClass:
         first_chunk = True
         total_rows_read = 0
 
-        for chunk in reader:
+        for chunk in tqdm(reader):
             chunk_len = len(chunk)
             chunk_idx = range(total_rows_read, total_rows_read + chunk_len)
 

@@ -211,13 +211,14 @@ class PreprocessClass:
 
         subprocess.call(f"shuf {path}/safe.csv -o {path}/safe_shuffled.csv", shell=True)
         subprocess.call(f"shuf {path}/dnstunnel.csv -o {path}/dnstunnel_shuffled.csv", shell=True)
-        time.sleep(3)"""
-        line_count_safe = int(subprocess.check_output(f"wc -l {path}/safe_shuffled.csv").decode("utf-8").encode("utf-8"))
-        line_count_dnstunnel = int(subprocess.check_output(f"wc -l {path}/dnstunnel_shuffled.csv").decode("utf-8").encode("utf-8"))
+        #line_count_safe = int(subprocess.check_output(f"wc -l {path}/safe_shuffled.csv").decode("utf-8").encode("utf-8"))
+        #line_count_dnstunnel = int(subprocess.check_output(f"wc -l {path}/dnstunnel_shuffled.csv").decode("utf-8").encode("utf-8"))"""
+        line_count_safe = 37447179
+        line_count_dnstunnel = 31135
 
         # %80 satır sayısını hesapla
-        satir_sayisi_80_safe = line_count_safe * 80 / 100
-        satir_sayisi_80_dnstunnel = line_count_dnstunnel * 80 / 100
+        satir_sayisi_80_safe = line_count_safe * 80 // 100
+        satir_sayisi_80_dnstunnel = line_count_dnstunnel * 80 // 100
 
         subprocess.call(f"head -n {satir_sayisi_80_safe} {path}/safe_shuffled.csv > {path}/train_tmp.csv", shell=True)
         subprocess.call(f"head -n {satir_sayisi_80_dnstunnel} {path}/dnstunnel_shuffled.csv >> {path}/train_tmp.csv", shell=True)

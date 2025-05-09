@@ -174,7 +174,7 @@ def main():
         "train_batch": 1000000,
         "test_batch": 1000000,
         "dir_dataset": "../dataset/",
-        "file_train": "../dataset/test.csv",
+        "file_train": "../dataset/train.csv",
         "file_test": "../dataset/test.csv",
         "xgb_params": {
             "verbosity": 0,

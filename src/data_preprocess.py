@@ -1,4 +1,6 @@
 import argparse
+import subprocess
+
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan, bulk, BulkIndexError
 import pandas as pd
@@ -197,49 +199,46 @@ class PreprocessClass:
 
         print("saved.")
 
-    def prep_dataset_for_train_gen(self, file_path):
-        # Sadece label sütununu oku
-        labels = pd.read_csv(file_path, usecols=['label'])
+    def prep_dataset_for_train_gen(self, path):
 
-        # Stratified split index'leri al
-        train_idx, test_idx = train_test_split(
-            labels.index,
-            test_size=0.2,
-            stratify=labels['label'],
-            random_state=42
-        )
+        subprocess.call(f"head -1 {path}/dataset.csv > {path}/header.csv", shell=True)
 
-        train_idx = set(train_idx)
-        test_idx = set(test_idx)
+        subprocess.call(f"cat {path}/dataset.csv | grep safe > {path}/safe.csv", shell=True)
+        subprocess.call(f"cat {path}/dataset.csv | grep dnstunnel > {path}/dnstunnel.csv", shell=True)
 
-        reader = pd.read_csv(file_path, chunksize=100_000)
+        subprocess.call(f"shuf {path}/dnstunnel.csv -o {path}/dnstunnel_shuffled.csv", shell=True)
 
-        train_out = open("../dataset/train.csv", "w")
-        test_out = open("../dataset/test.csv", "w")
+        subprocess.call(f"shuf {path}/safe.csv -o {path}/safe_shuffled.csv", shell=True)
+        subprocess.call(f"shuf {path}/dnstunnel.csv -o {path}/dnstunnel_shuffled.csv", shell=True)
 
-        first_chunk = True
-        total_rows_read = 0
+        line_count_safe = int(subprocess.check_output(f"wc -l {path}/safe_shuffled.csv").decode("utf-8").encode("utf-8"))
+        line_count_dnstunnel = int(subprocess.check_output(f"wc -l {path}/dnstunnel_shuffled.csv").decode("utf-8").encode("utf-8"))
 
-        for chunk in tqdm(reader):
-            chunk_len = len(chunk)
-            chunk_idx = range(total_rows_read, total_rows_read + chunk_len)
+        # %80 satır sayısını hesapla
+        satir_sayisi_80_safe = line_count_safe * 80 / 100
+        satir_sayisi_80_dnstunnel = line_count_dnstunnel * 80 / 100
 
-            # hangi satırlar test/train
-            chunk['row_id'] = list(chunk_idx)
+        subprocess.call(f"head -n {satir_sayisi_80_safe} {path}/safe_shuffled.csv > {path}/train_tmp.csv", shell=True)
+        subprocess.call(f"head -n {satir_sayisi_80_dnstunnel} {path}/dnstunnel_shuffled.csv >> {path}/train_tmp.csv", shell=True)
 
-            train_chunk = chunk[chunk['row_id'].isin(train_idx)]
-            test_chunk = chunk[chunk['row_id'].isin(test_idx)]
+        subprocess.call(f"tail -n +{satir_sayisi_80_safe+1} {path}/safe_shuffled.csv > {path}/test_tmp.csv", shell=True)
+        subprocess.call(f"tail -n +{satir_sayisi_80_safe+1} {path}/dnstunnel_shuffled.csv >> {path}/test_tmp.csv", shell=True)
 
-            # İlk yazımda header yaz, sonra ekle
-            train_chunk.drop(columns=["row_id"]).to_csv(train_out, mode='a', index=False, header=first_chunk)
-            test_chunk.drop(columns=["row_id"]).to_csv(test_out, mode='a', index=False, header=first_chunk)
+        subprocess.call(f"shuf {path}/train_tmp.csv -o {path}/train_tmp_shuffled.csv", shell=True)
+        subprocess.call(f"shuf {path}/test_tmp.csv -o {path}/test_tmp_shuffled.csv", shell=True)
 
-            first_chunk = False
-            total_rows_read += chunk_len
+        subprocess.call(f"cp {path}/header.csv {path}/train.csv", shell=True)
+        subprocess.call(f"cat {path}/train_tmp_shuffled.csv >> {path}/train.csv", shell=True)
 
-        train_out.close()
-        test_out.close()
-        print("saved.")
+        subprocess.call(f"cp {path}/header.csv {path}/test.csv", shell=True)
+        subprocess.call(f"cat {path}/test_tmp_shuffled.csv >> {path}/test.csv", shell=True)
+
+
+
+
+
+
+
 
 
 

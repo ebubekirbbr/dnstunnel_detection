@@ -7,6 +7,8 @@ src/mlruns
 *.so
 .idea
 
+dataset/
+input/dga_*
 # Distribution / packaging
 .Python
 build/

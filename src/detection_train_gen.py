@@ -84,6 +84,7 @@ def save_results(model: xgboost.Booster, feature_names, test_gen):
     open(f"../model_results/results.json", "w").write(json.dumps(results, indent=2))
 
     importance = model.get_score(importance_type='weight')
+    importance = {feat: importance.get(feat, 0) for feat in feature_names}
 
     plot_feature_importance(feature_names, list(importance.values()))
 
@@ -154,7 +155,7 @@ def main_train(params):
     )
 
     save_results(model, feature_names, gen_test)
-    mlflow.log_artifacts("../anomaly_results")
+    mlflow.log_artifacts("../model_results")
     mlflow.end_run()
 
 
@@ -173,7 +174,7 @@ def main():
         "train_batch": 1000000,
         "test_batch": 100000,
         "dir_dataset": "../dataset/",
-        "file_train": "../dataset/train.csv",
+        "file_train": "../dataset/test.csv",
         "file_test": "../dataset/test.csv",
         "xgb_params": {
             "verbosity": 0,

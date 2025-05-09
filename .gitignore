@@ -6,6 +6,7 @@ src/mlruns
 # C extensions
 *.so
 .idea
+model_results
 
 dataset/
 input/dga_*

@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import time
 
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import scan, bulk, BulkIndexError
@@ -201,7 +202,7 @@ class PreprocessClass:
 
     def prep_dataset_for_train_gen(self, path):
 
-        subprocess.call(f"head -1 {path}/dataset.csv > {path}/header.csv", shell=True)
+        """subprocess.call(f"head -1 {path}/dataset.csv > {path}/header.csv", shell=True)
 
         subprocess.call(f"cat {path}/dataset.csv | grep safe > {path}/safe.csv", shell=True)
         subprocess.call(f"cat {path}/dataset.csv | grep dnstunnel > {path}/dnstunnel.csv", shell=True)
@@ -210,7 +211,7 @@ class PreprocessClass:
 
         subprocess.call(f"shuf {path}/safe.csv -o {path}/safe_shuffled.csv", shell=True)
         subprocess.call(f"shuf {path}/dnstunnel.csv -o {path}/dnstunnel_shuffled.csv", shell=True)
-
+        time.sleep(3)"""
         line_count_safe = int(subprocess.check_output(f"wc -l {path}/safe_shuffled.csv").decode("utf-8").encode("utf-8"))
         line_count_dnstunnel = int(subprocess.check_output(f"wc -l {path}/dnstunnel_shuffled.csv").decode("utf-8").encode("utf-8"))
 

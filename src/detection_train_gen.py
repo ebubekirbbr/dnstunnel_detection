@@ -49,7 +49,6 @@ def evaluate_model(model, test_gen, feature_names):
         "recall": {"safe": round(recall[0], 2), "dnstunnel": round(recall[1], 2)},
         "cm": cm.tolist()
     }
-
     return results
 
 def plot_feature_importance(feature_names, importance):
@@ -81,6 +80,10 @@ def save_results(model: xgboost.Booster, feature_names, test_gen):
     #results = evaluate_generator(model, test_gen, feature_names)
     results = evaluate_model(model, test_gen, feature_names=feature_names)
 
+    mlflow.log_metric("dnstunnel_precison", results["precision"]["dnstunnel"], 0)
+    mlflow.log_metric("dnstunnel_recall", results["recall"]["dnstunnel"], 0)
+    mlflow.log_metric("safe_recall", results["recall"]["safe"], 0)
+    mlflow.log_metric("safe_precision", results["precision"]["safe"], 0)
     open(f"../model_results/results.json", "w").write(json.dumps(results, indent=2))
 
     importance = model.get_score(importance_type='weight')
@@ -130,6 +133,10 @@ def main_train(params):
         feature_names = feature_names[params["features"]]
 
     feature_names = feature_names.tolist()
+
+    mlflow.log_param("features_names", feature_names)
+    mlflow.log_param("len_features", len(feature_names))
+
     gen_train = AnomalyDataProcessor(
         params["file_train"],
         read_line=params["train_read_line"],

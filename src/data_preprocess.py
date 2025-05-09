@@ -235,6 +235,8 @@ class PreprocessClass:
         subprocess.call(f"cp {path}/header.csv {path}/test.csv", shell=True)
         subprocess.call(f"cat {path}/test_tmp_shuffled.csv >> {path}/test.csv", shell=True)
 
+        subprocess.call(f"rm -f train_tmp.csv test_tmp.csv train_tmp_shuffled.csv test_tmp_shuffled.csv", shell=True)
+
 
 
 

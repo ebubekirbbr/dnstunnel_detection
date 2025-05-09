@@ -97,7 +97,6 @@ class AnomalyDataProcessor:
             return X_train, labels
 
         except Exception as e:
-            traceback.print_exc()
             self.file.close()
             raise StopIteration
 

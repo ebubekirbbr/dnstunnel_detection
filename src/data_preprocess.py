@@ -197,6 +197,50 @@ class PreprocessClass:
 
         print("saved.")
 
+    def prep_dataset_for_train_gen(self, file_path):
+        # Sadece label sütununu oku
+        labels = pd.read_csv(file_path, usecols=['label'])
+
+        # Stratified split index'leri al
+        train_idx, test_idx = train_test_split(
+            labels.index,
+            test_size=0.2,
+            stratify=labels['label'],
+            random_state=42
+        )
+
+        train_idx = set(train_idx)
+        test_idx = set(test_idx)
+
+        reader = pd.read_csv(file_path, chunksize=100_000)
+
+        train_out = open("../dataset/train.csv", "w")
+        test_out = open("../dataset/test.csv", "w")
+
+        first_chunk = True
+        total_rows_read = 0
+
+        for chunk in reader:
+            chunk_len = len(chunk)
+            chunk_idx = range(total_rows_read, total_rows_read + chunk_len)
+
+            # hangi satırlar test/train
+            chunk['row_id'] = list(chunk_idx)
+
+            train_chunk = chunk[chunk['row_id'].isin(train_idx)]
+            test_chunk = chunk[chunk['row_id'].isin(test_idx)]
+
+            # İlk yazımda header yaz, sonra ekle
+            train_chunk.drop(columns=["row_id"]).to_csv(train_out, mode='a', index=False, header=first_chunk)
+            test_chunk.drop(columns=["row_id"]).to_csv(test_out, mode='a', index=False, header=first_chunk)
+
+            first_chunk = False
+            total_rows_read += chunk_len
+
+        train_out.close()
+        test_out.close()
+        print("saved.")
+
 
 
 def argument_parsing():
@@ -218,7 +262,7 @@ def main():
     elif args.function == "es2file":
         preprocessor.es2file(args.file_path, args.es_host)
     elif args.function == "prep_dataset":
-        preprocessor.prep_dataset_for_train(args.file_path)
+        preprocessor.prep_dataset_for_train_gen(args.file_path)
     else:
         print("enter a function")
 

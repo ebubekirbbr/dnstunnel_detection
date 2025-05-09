@@ -224,7 +224,7 @@ class PreprocessClass:
         subprocess.call(f"head -n {satir_sayisi_80_dnstunnel} {path}/dnstunnel_shuffled.csv >> {path}/train_tmp.csv", shell=True)
 
         subprocess.call(f"tail -n +{satir_sayisi_80_safe+1} {path}/safe_shuffled.csv > {path}/test_tmp.csv", shell=True)
-        subprocess.call(f"tail -n +{satir_sayisi_80_safe+1} {path}/dnstunnel_shuffled.csv >> {path}/test_tmp.csv", shell=True)
+        subprocess.call(f"tail -n +{satir_sayisi_80_dnstunnel+1} {path}/dnstunnel_shuffled.csv >> {path}/test_tmp.csv", shell=True)
 
         subprocess.call(f"shuf {path}/train_tmp.csv -o {path}/train_tmp_shuffled.csv", shell=True)
         subprocess.call(f"shuf {path}/test_tmp.csv -o {path}/test_tmp_shuffled.csv", shell=True)

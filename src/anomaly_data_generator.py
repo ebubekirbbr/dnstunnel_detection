@@ -88,11 +88,15 @@ class AnomalyDataProcessor:
                 'safe': 0,
                 'dnstunnel': 1
             })
+            #print(df["label"].value_counts())
 
             if self.features:
-                X_train = df[self.features]
+                feat = self.features.copy()
+                if "label" in feat:
+                    feat.remove("label")
+                X_train = df[feat]
             else:
-                X_train = df
+                X_train = df.drop(columns=[label_col])
 
             return X_train, labels
 

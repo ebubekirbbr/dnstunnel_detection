@@ -1,43 +1,34 @@
 import json
-import subprocess
-
-import mlflow
 import numpy as np
-import xgboost
-import xgboost as xgb
-from tqdm import tqdm
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, precision_score, recall_score
 import matplotlib.pyplot as plt
+import mlflow
 from anomaly_data_generator import AnomalyDataProcessor
+import joblib
 
 
 def get_or_create_experiment(experiment_name):
-    # Check if the experiment already exists
     experiment = mlflow.get_experiment_by_name(experiment_name)
 
     if experiment is None:
-        # If the experiment does not exist, create it
         experiment_id = mlflow.create_experiment(experiment_name)
         print(f"Experiment '{experiment_name}' created with ID: {experiment_id}")
     else:
-        # If the experiment exists, return its ID
         experiment_id = experiment.experiment_id
 
     return experiment_id
 
 
 def evaluate_model(model, test_gen, feature_names):
-
     y_true = []
     y_pred = []
+
     for X_batch, y_batch in tqdm(test_gen, desc="validation", ascii=True, dynamic_ncols=True):
         y_true += y_batch.values.flatten().tolist()
-
-        #y_pred_batch = model.predict(X_batch)
-        dtest = xgb.DMatrix(X_batch, feature_names=feature_names)
-        y_prob_batch = model.predict(dtest)
-        y_pred_batch = (y_prob_batch >= 0.5).astype(int)
+        y_pred_batch = model.predict(X_batch)
         y_pred += y_pred_batch.tolist()
 
     cm = confusion_matrix(y_true, y_pred)
@@ -49,7 +40,8 @@ def evaluate_model(model, test_gen, feature_names):
         "recall": {"safe": round(recall[0], 2), "dnstunnel": round(recall[1], 2)},
         "cm": cm.tolist()
     }
-    return results
+    return results, y_true, y_pred
+
 
 def plot_feature_importance(feature_names, importance):
     """
@@ -68,62 +60,91 @@ def plot_feature_importance(feature_names, importance):
     plt.xticks(rotation=90)
     plt.title('Feature Importance')
     plt.tight_layout()
-    plt.savefig(f"../model_results/fi.png")
+    plt.savefig(f"../model_results/rf_fi.png")
 
 
-def save_results(model: xgboost.Booster, feature_names, test_gen):
-    model_path = f'../model_results/model.bin'
+def save_results(model, feature_names, test_gen):
+    joblib.dump(model, '../model_results/rf_model.joblib')
 
-    model.save_model(model_path)
-
-    #results = evaluate_generator(model, test_gen, feature_names)
-    results = evaluate_model(model, test_gen, feature_names=feature_names)
+    results, y_true, y_pred = evaluate_model(model, test_gen, feature_names)
 
     mlflow.log_metric("dnstunnel_precison", results["precision"]["dnstunnel"], 0)
     mlflow.log_metric("dnstunnel_recall", results["recall"]["dnstunnel"], 0)
     mlflow.log_metric("safe_recall", results["recall"]["safe"], 0)
     mlflow.log_metric("safe_precision", results["precision"]["safe"], 0)
-    open(f"../model_results/results.json", "w").write(json.dumps(results, indent=2))
 
-    importance = model.get_score(importance_type='weight')
-    importance = {feat: importance.get(feat, 0) for feat in feature_names}
+    with open(f"../model_results/rf_results.json", "w") as f:
+        json.dump(results, f, indent=2)
 
-    plot_feature_importance(feature_names, list(importance.values()))
+    with open(f"../model_results/y_true.json", "w") as f:
+        json.dump(y_true, f)
+
+    with open(f"../model_results/y_pred.json", "w") as f:
+        json.dump(y_true, f)
+
+    plot_feature_importance(feature_names, model.feature_importances_)
+
+    mlflow.log_artifacts("../model_results")
 
 
-def train_with_generator(xgb_params, gen, feature_names):
-    xgb_model = None
+class BatchRandomForest:
+    def __init__(self, n_estimators, max_depth, n_jobs=-1):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.n_jobs = n_jobs
+        self.model = None
 
-    xgb_params_inc = {'process_type': 'update', 'updater': 'refresh', 'refresh_leaf': True}
+    def partial_fit(self, X, y, n_trees_per_batch=10):
+        if self.model is None:
+            self.model = RandomForestClassifier(
+                n_estimators=n_trees_per_batch,
+                max_depth=self.max_depth,
+                n_jobs=self.n_jobs,
+                #warm_start=True
+            )
+        else:
+            self.model.n_estimators += n_trees_per_batch
 
+        """elif self.model.n_estimators < self.n_estimators:
+            self.model.n_estimators += n_trees_per_batch"""
+
+        self.model.fit(X, y)
+        return self
+
+def train_with_generator(rf_params, gen, feature_names):
+    # BatchRandomForest sınıfından bir örnek oluştur
+    model = BatchRandomForest(
+        n_estimators=rf_params.get('n_estimators', 100),
+        max_depth=rf_params.get('max_depth', 12),
+        n_jobs=rf_params.get('nthread', -1)
+    )
+
+    # Her batch için incremental eğitim yap
     for X_batch, y_batch in tqdm(gen, desc="train", ascii=True, dynamic_ncols=True):
+        model.partial_fit(
+            X=X_batch,
+            y=y_batch.values.ravel(),
+            n_trees_per_batch=10
+        )
 
-        dtrain = xgb.DMatrix(X_batch, label=y_batch)
-        assert len(dtrain.get_label()) == dtrain.num_row(), "Mismatch in labels and rows"
+        if model.model:  # model oluşturulduysa
+            print(f"Mevcut ağaç sayısı: {model.model.n_estimators}/{model.n_estimators}")
 
-        if xgb_model:
-            xgb_params.update(xgb_params_inc)
-
-        xgb_model = xgb.train(params=xgb_params,
-                              dtrain=dtrain,
-                              xgb_model=xgb_model,
-                              num_boost_round=xgb_params["n_estimators"],
-                              verbose_eval=xgb_params["verbose"]
-                              )
-
-    return xgb_model
+    print(f"Eğitim tamamlandı. Toplam ağaç sayısı: {model.model.n_estimators}")
+    return model.model
 
 
 def main_train(params):
-
-    experiment = "tunnel"
-
+    experiment = params["experiment"]
     experiment_id = get_or_create_experiment(experiment)
 
     mlflow.start_run(experiment_id=experiment_id, nested=True)
     mlflow.set_tag("mlflow.note.content", params["experiment_name"])
     for key, value in params.items():
-        mlflow.log_param(key, value)
+        if isinstance(value, (dict, list)):
+            mlflow.log_param(key, str(value))
+        else:
+            mlflow.log_param(key, value)
 
     feature_names = [line.strip() for line in open(f"../input/features.txt", "r").readlines()]
     feature_names.remove("label")
@@ -149,65 +170,45 @@ def main_train(params):
         read_line=params["test_read_line"],
         features=feature_names,
         batch_size=params["test_batch"]
-
     )
 
     mlflow.log_param("train_data", gen_train.row_count)
     mlflow.log_param("test_data", gen_test.row_count)
 
     model = train_with_generator(
-        params["xgb_params"],
+        params["rf_params"],
         gen_train,
         feature_names
     )
 
     save_results(model, feature_names, gen_test)
-    mlflow.log_artifacts("../model_results")
     mlflow.end_run()
 
 
 def main():
-
-    params_multi = [
-
-    {
-
-        #"features": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43],
+    params_multi = [{
         "features": None,
-        #"features": [0, 1, 2, 3, 8, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40],
-        "experiment_name": "init",
-        "algorithm": "xgboost",
+        "experiment": "tunnel",
+        "experiment_name": "tr1",
+        "algorithm": "rf",
         "train_read_line": None,
         "test_read_line": None,
-        "train_batch": 100000,
-        "test_batch": 100000,
+        "train_batch": 1000000,
+        "test_batch": 1000000,
         "dir_dataset": "../dataset/",
         "file_train": "../dataset/train.csv",
         "file_test": "../dataset/test.csv",
-        "xgb_params": {
-            "verbosity": 0,
-            "nthread": -1,
-            "tree_method": "hist",
-            "max_depth": 12,
-            "scale_pos_weight": 600,
-            "learning_rate": 0.1,
-            "colsample_bytree": 0.8,
-            "alpha": 0,
-            "lambda": 1,
-            "objective": "binary:logistic",
+        "rf_params": {
             "n_estimators": 100,
-            "eval_metric": "logloss",
-            "verbose": False
+            "max_depth": 12,
+            "n_jobs": -1
         }
-    }
-    ]
+    }]
 
     for params in params_multi:
-        #subprocess.call("rm -f ../model_results/*", shell=True)
         print(params["experiment_name"])
         main_train(params)
 
 
 if __name__ == "__main__":
     main()
-

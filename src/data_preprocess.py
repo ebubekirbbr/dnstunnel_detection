@@ -1,4 +1,5 @@
 import argparse
+import json
 import subprocess
 import time
 
@@ -237,13 +238,20 @@ class PreprocessClass:
 
         subprocess.call(f"rm -f train_tmp.csv test_tmp.csv train_tmp_shuffled.csv test_tmp_shuffled.csv", shell=True)
 
+    def csv_fix(self):
+        import pandas as pd
+        columns = [line.strip() for line in open("../input/features.txt").readlines()]
+        dtypes = json.loads(open("../input/dtypes.json").read())
+
+        df = pd.read_csv("../dataset/test44.csv", dtype=dtypes)
 
 
+        # 2. Sadece istediğin sütunları seç
+        selected_columns = columns
+        filtered_df = df[selected_columns]
 
-
-
-
-
+        # 3. Yeni dosya olarak kaydet
+        filtered_df.to_csv("../dataset/test.csv", index=False)
 
 
 def argument_parsing():
@@ -266,6 +274,8 @@ def main():
         preprocessor.es2file(args.file_path, args.es_host)
     elif args.function == "prep_dataset":
         preprocessor.prep_dataset_for_train_gen(args.file_path)
+    elif args.function == "csv_fix":
+        preprocessor.csv_fix()
     else:
         print("enter a function")
 

@@ -1,0 +1,14 @@
+numpy
+pandas
+scikit-learn
+tensorflow
+mlflow
+tqdm
+xgboost
+lightgbm
+joblib
+matplotlib
+tldextract
+torch
+pytorch-tabnet
+ngboost

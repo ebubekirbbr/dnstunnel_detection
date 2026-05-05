@@ -9,6 +9,7 @@ src/mlruns
 model_results
 
 dataset/
+.claude/
 input/dga_*
 # Distribution / packaging
 .Python
